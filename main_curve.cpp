@@ -4,27 +4,11 @@
 #  include <ql/auto_link.hpp>
 #endif
 
-#include <boost/timer.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/function.hpp>
-
 #include <iostream>
 #include <iomanip>
 
 using namespace QuantLib;
 using namespace std;
-
-#ifdef BOOST_MSVC
-#  ifdef QL_ENABLE_THREAD_SAFE_OBSERVER_PATTERN
-#    include <ql/auto_link.hpp>
-#    define BOOST_LIB_NAME boost_system
-#    include <boost/config/auto_link.hpp>
-#    undef BOOST_LIB_NAME
-#    define BOOST_LIB_NAME boost_thread
-#    include <boost/config/auto_link.hpp>
-#    undef BOOST_LIB_NAME
-#  endif
-#endif
 
 #if defined(QL_ENABLE_SESSIONS)
 namespace QuantLib {
@@ -34,107 +18,10 @@ namespace QuantLib {
 #endif
 
 
-namespace {
-
-    class UpdateCounter : public Observer {
-      public:
-        UpdateCounter() = default;
-        void update() override { ++counter_; }
-        Size counter() const { return counter_; }
-
-      private:
-        Size counter_ = 0;
-    };
-
-    class RestoreUpdates {
-      public:
-        ~RestoreUpdates() {
-            ObservableSettings::instance().enableUpdates();
-        }
-    };
-
-}
-
-
-#ifdef QL_ENABLE_THREAD_SAFE_OBSERVER_PATTERN
-#include <atomic>
-#include <mutex>
-#include <thread>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-
-#include <list>
-
-namespace {
-
-    class MTUpdateCounter : public Observer {
-      public:
-        MTUpdateCounter() : counter_(0) {
-            ++instanceCounter_;
-        }
-        ~MTUpdateCounter() {
-            --instanceCounter_;
-        }
-        void update() {
-            ++counter_;
-        }
-        int counter() { return counter_; }
-        static int instanceCounter() { return instanceCounter_; }
-
-      private:
-        std::atomic<int> counter_;
-        static std::atomic<int> instanceCounter_;
-    };
-
-    std::atomic<int> MTUpdateCounter::instanceCounter_(0);
-
-    class GarbageCollector {
-      public:
-        GarbageCollector() : terminate_(false) { }
-
-        void addObj(const ext::shared_ptr<MTUpdateCounter>& updateCounter) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            objList.push_back(updateCounter);
-        }
-
-        void run() {
-            while(!terminate_) {
-                Size objListSize;
-                {
-                    std::lock_guard<std::mutex> lock(mutex_);
-                    objListSize = objList.size();
-                }
-
-                if (objListSize > 20) {
-                    // trigger gc
-                    while (objListSize > 0) {
-                        std::lock_guard<std::mutex> lock(mutex_);
-                        objList.pop_front();
-                        objListSize = objList.size();
-                    }
-                }
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(2));
-            }
-            objList.clear();
-        }
-
-        void terminate() {
-            terminate_ = true;
-        }
-      private:
-        std::mutex mutex_;
-        std::atomic<bool> terminate_;
-
-        std::list<ext::shared_ptr<MTUpdateCounter> > objList;
-    };
-}
-#endif
-
-
 int main(int, char* [])
 {
-    //try
-    //{
+    try
+       {
         
         Date tradeDate(10,Mar,2023);
         Date CDS_settle =  WeekendsOnly().advance(tradeDate, 1 * Days);
@@ -170,10 +57,6 @@ int main(int, char* [])
         Settings::instance().evaluationDate() =tradeDate;
         ext::shared_ptr<YieldTermStructure> esterTermStructure(new PiecewiseYieldCurve<Discount, LogLinear>(curveDate,
                                                                                                             esterInstruments,                           Actual365Fixed()));
-        
-        esterTermStructure->registerWith(Settings::instance().evaluationDate()= tradeDate);
-        esterTermStructure->enableExtrapolation(true);
-        esterTermStructure->deepUpdate();
         
         RelinkableHandle<YieldTermStructure> discountingTermStructure;
         discountingTermStructure.linkTo(esterTermStructure);
@@ -243,17 +126,17 @@ int main(int, char* [])
         ext::make_shared<IsdaCdsEngine>(isdaCts, 0.4, discountingTermStructure);
         return 0;
         
-    //}
-    //catch (exception &e)
-    //{
-    //   cerr << e.what() << endl;
-    //    return 1;
-    //}
-    //catch (...)
-    //{
-    //   cerr << "unknown error" << endl;
-    //    return 1;
-    //}
+    }
+    catch (exception &e)
+    {
+       cerr << e.what() << endl;
+        return 1;
+    }
+    catch (...)
+    {
+       cerr << "unknown error" << endl;
+        return 1;
+    }
 
 
 }
