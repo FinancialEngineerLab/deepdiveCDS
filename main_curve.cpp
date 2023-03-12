@@ -99,14 +99,9 @@ int main(int, char* [])
         Handle<DefaultProbabilityTermStructure>(ext::make_shared<
                                                 PiecewiseDefaultCurve<SurvivalProbability, LogLinear> >(curveDate
                                                                                                         ,isdaCdsHelpers,                            Actual365Fixed()));
-        isdaCts->registerWith(Settings::instance().evaluationDate()= tradeDate);
+
         isdaCts->enableExtrapolation(true);
-        isdaCts->deepUpdate();
-        std::cout << tradeDate<<std::endl;
-        std::cout << isdaCts->referenceDate() << std::endl;
-        std::cout << discountingTermStructure->referenceDate() << std::endl;
-        std::cout << Settings::instance().evaluationDate()  << std::endl;
-        
+     
         
         
         std::cout << "ISDA credit curve:" << std::endl;
@@ -118,9 +113,6 @@ int main(int, char* [])
         std::cout << ";" << isdaCts->survivalProbability(2.0,true) << std::endl;
         std::cout << ";" << isdaCts->survivalProbability(3.0, true) << std::endl;
         
-        
-        std::cout << isdaCts->defaultProbability(0.25, true) << std::endl;
-        std::cout << isdaCts->hazardRate(0.25, true) << std::endl;
         
         ext::shared_ptr<IsdaCdsEngine> isdaPricer =
         ext::make_shared<IsdaCdsEngine>(isdaCts, 0.4, discountingTermStructure);
