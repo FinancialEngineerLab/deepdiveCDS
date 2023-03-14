@@ -38,13 +38,11 @@ int main(int, char* [])
         ext::shared_ptr<Estr> estser(new Estr());
         std::vector<ext::shared_ptr<RateHelper>> esterInstruments;
         std::vector<std::pair<int, double>> SWAPDATA;
-        SWAPDATA.emplace_back(std::make_pair(3, 0.01));
-        SWAPDATA.emplace_back(std::make_pair(6, 0.02));
-        SWAPDATA.emplace_back(std::make_pair(9, 0.03));
-        SWAPDATA.emplace_back(std::make_pair(12, 0.04));
-        SWAPDATA.emplace_back(std::make_pair(24, 0.05));
-        SWAPDATA.emplace_back(std::make_pair(36, 0.07));
-        SWAPDATA.emplace_back(std::make_pair(48, 0.08));
+        SWAPDATA.emplace_back(std::make_pair(6, 0.03309));
+        SWAPDATA.emplace_back(std::make_pair(12, 0.03582));
+        SWAPDATA.emplace_back(std::make_pair(18, 0.03564));
+        SWAPDATA.emplace_back(std::make_pair(24, 0.03467));
+        SWAPDATA.emplace_back(std::make_pair(36, 0.03224));
         
         for (int i = 0; i < SWAPDATA.size(); i++)
         {
@@ -58,8 +56,10 @@ int main(int, char* [])
         ext::shared_ptr<YieldTermStructure> esterTermStructure(new PiecewiseYieldCurve<Discount, LogLinear>(curveDate,
                                                                                                             esterInstruments,                           Actual365Fixed()));
         
+           esterTermStructure->enableExtrapolation(true);
         RelinkableHandle<YieldTermStructure> discountingTermStructure;
         discountingTermStructure.linkTo(esterTermStructure);
+        
         
         std::cout << discountingTermStructure->referenceDate() << std::endl;
         std::cout << Settings::instance().evaluationDate()  << std::endl;
@@ -67,7 +67,7 @@ int main(int, char* [])
         std::cout <<discountingTermStructure->discount(0.5, true) << std::endl;
         std::cout <<discountingTermStructure->discount(0.75, true) << std::endl;
         std::cout <<discountingTermStructure->discount(1.0, true) << std::endl;
-        
+        std::cout <<discountingTermStructure->discount(2.0, true) << std::endl;
         
         CreditDefaultSwap::PricingModel model = CreditDefaultSwap::ISDA;
         ext::shared_ptr<CdsHelper> cds6m(new SpreadCdsHelper(
@@ -94,28 +94,78 @@ int main(int, char* [])
         isdaCdsHelpers.push_back(cds24m);
         isdaCdsHelpers.push_back(cds36m);
         
-        Settings::instance().evaluationDate() =tradeDate;
         Handle<DefaultProbabilityTermStructure> isdaCts =
         Handle<DefaultProbabilityTermStructure>(ext::make_shared<
                                                 PiecewiseDefaultCurve<SurvivalProbability, LogLinear> >(curveDate
                                                                                                         ,isdaCdsHelpers,                            Actual365Fixed()));
-
         isdaCts->enableExtrapolation(true);
-     
-        
-        
+           
+           Settings::instance().evaluationDate() =tradeDate;
         std::cout << "ISDA credit curve:" << std::endl;
         std::cout << "date;time;survivalprob" << std::endl;
+        std::cout <<  isdaCts->survivalProbability(0.25,true) << std::endl;
+        std::cout <<  isdaCts->survivalProbability(0.5,true) << std::endl;
+        std::cout << isdaCts->survivalProbability(0.75,true) << std::endl;
+        std::cout <<  isdaCts->survivalProbability(1.0,true) << std::endl;
+        std::cout <<  isdaCts->survivalProbability(1.25,true) << std::endl;
+        std::cout <<  isdaCts->survivalProbability(1.50, true) << std::endl;
+        std::cout <<  isdaCts->survivalProbability(1.75, true) << std::endl;
+        std::cout <<  isdaCts->survivalProbability(2.00, true) << std::endl;
         
-        std::cout <<  ";" << isdaCts->survivalProbability(0.25,true) << std::endl;
-        std::cout <<  ";" << isdaCts->survivalProbability(0.5,true) << std::endl;
-        std::cout << ";" << isdaCts->survivalProbability(1.0,true) << std::endl;
-        std::cout << ";" << isdaCts->survivalProbability(2.0,true) << std::endl;
-        std::cout << ";" << isdaCts->survivalProbability(3.0, true) << std::endl;
-        
-        
+           std::cout << "Hazard Rate " << std::endl;
+        std::cout << isdaCts->hazardRate(0.25, true) << std::endl;
+        std::cout << isdaCts->hazardRate(0.5, true) << std::endl;
+        std::cout << isdaCts->hazardRate(0.75, true) << std::endl;
+        std::cout << isdaCts->hazardRate(1.0, true) << std::endl;
+        std::cout << isdaCts->hazardRate(1.25, true) << std::endl;
+        std::cout << isdaCts->hazardRate(1.5, true) << std::endl;
+        std::cout << isdaCts->hazardRate(1.75, true) << std::endl;
+        std::cout << isdaCts->hazardRate(2.0, true) << std::endl;
+           
+        std::cout << "Default Probability " << std::endl;
+        std::cout << isdaCts->defaultProbability(0.25, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(0.5, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(0.75, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(1.0, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(1.25, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(1.5, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(1.75, true) << std::endl;
+        std::cout << isdaCts->defaultProbability(2.0, true) << std::endl;
+           
         ext::shared_ptr<IsdaCdsEngine> isdaPricer =
         ext::make_shared<IsdaCdsEngine>(isdaCts, 0.4, discountingTermStructure);
+           
+        
+        Schedule sched_1y(Date(20,March,2023), Date(20,December, 2023), 3*Months,
+                   TARGET(), Following, Following, DateGeneration::CDS, false, Date(), Date());
+           
+           
+        ext::shared_ptr<CreditDefaultSwap> trade_uscds_eur_1y =
+               ext::shared_ptr<CreditDefaultSwap>(
+                   new CreditDefaultSwap(Protection::Seller, 100000000.0, 0.0088, sched_1y,
+                                         Following, Actual360(), true, true,
+                                         Date(10,March,2023), ext::shared_ptr<Claim>(),
+                                         Actual360(true), true));
+
+           ext::shared_ptr<FixedRateCoupon>
+           cp = ext::dynamic_pointer_cast<FixedRateCoupon>(trade_uscds_eur_1y->coupons()[0]);
+           std::cout << "first period = " << cp->accrualStartDate() << " to " << cp->accrualEndDate() <<
+               " accrued amount = " << cp->accruedAmount(Date(12,March,2023)) << std::endl;
+
+           
+           ext::shared_ptr<IsdaCdsEngine> engine = ext::make_shared<IsdaCdsEngine>(
+                   Handle<DefaultProbabilityTermStructure>(isdaCts), 0.4, discountingTermStructure,
+                   false, IsdaCdsEngine::Taylor, IsdaCdsEngine::NoBias, IsdaCdsEngine::Piecewise);
+
+           trade_uscds_eur_1y->setPricingEngine(engine);
+
+           std::cout << "reference trade NPV = " << trade_uscds_eur_1y->NPV() << std::endl;
+
+           
+           std::cout << "Par Spread Sensitivity " << std::endl;
+           
+           
+           
         return 0;
         
     }
