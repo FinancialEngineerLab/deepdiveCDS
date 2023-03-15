@@ -70,20 +70,34 @@ int main(int, char* [])
         std::cout <<discountingTermStructure->discount(2.0, true) << std::endl;
         
         CreditDefaultSwap::PricingModel model = CreditDefaultSwap::ISDA;
+           
+        
+           double cds6mpremium = 0.00300;
+           double cds12mpremium = 0.008489;
+           double cds24mpremium = 0.006002;
+           double cds36mpremium = 0.005002;
+           
+           std::vector<double> cdspremium_vec;
+           cdspremium_vec.emplace_back(cds6mpremium);
+           cdspremium_vec.emplace_back(cds12mpremium);
+           cdspremium_vec.emplace_back(cds24mpremium);
+           cdspremium_vec.emplace_back(cds36mpremium);
+           
+           
         ext::shared_ptr<CdsHelper> cds6m(new SpreadCdsHelper(
-                                                             0.00300, 6 * Months, 1, WeekendsOnly(), Quarterly, Following,
+                                                             cdspremium_vec[0], 6 * Months, 1, WeekendsOnly(), Quarterly, Following,
                                                              DateGeneration::CDS, Actual360(), 0.4, discountingTermStructure, true, true, Date(),
                                                              Actual360(true), true, model));
         ext::shared_ptr<CdsHelper> cds12m(new SpreadCdsHelper(
-                                                              0.008489, 12 * Months, 1, WeekendsOnly(), Quarterly, Following,
+                                                              cdspremium_vec[1], 12 * Months, 1, WeekendsOnly(), Quarterly, Following,
                                                               DateGeneration::CDS,  Actual360(), 0.4, discountingTermStructure, true, true, Date(),
                                                               Actual360(true), true, model));
         ext::shared_ptr<CdsHelper> cds24m(new SpreadCdsHelper(
-                                                              0.006002, 24 * Months, 1,WeekendsOnly(), Quarterly, Following,
+                                                              cdspremium_vec[2], 24 * Months, 1,WeekendsOnly(), Quarterly, Following,
                                                               DateGeneration::CDS,  Actual360(), 0.4, discountingTermStructure, true, true, Date(),
                                                               Actual360(true), true, model));
         ext::shared_ptr<CdsHelper> cds36m(new SpreadCdsHelper(
-                                                              0.005002, 36 * Months, 1, WeekendsOnly(), Quarterly, Following,
+                                                              cdspremium_vec[3], 36 * Months, 1, WeekendsOnly(), Quarterly, Following,
                                                               DateGeneration::CDS,  Actual360(), 0.4, discountingTermStructure, true, true, Date(),
                                                               Actual360(true), true, model));
         
@@ -164,6 +178,109 @@ int main(int, char* [])
            
            std::cout << "Par Spread Sensitivity " << std::endl;
            
+           for (int i =0; i<isdaCdsHelpers.size();i++)
+           {
+               
+               cdspremium_vec[i] = cdspremium_vec[i] + 0.0001;
+                  
+               
+            ext::shared_ptr<CdsHelper> cds6m(new SpreadCdsHelper(
+                                                                 cdspremium_vec[0], 6 * Months, 1, WeekendsOnly(), Quarterly, Following,
+                                                                 DateGeneration::CDS, Actual360(), 0.4, discountingTermStructure, true, true, Date(),
+                                                                 Actual360(true), true, model));
+            ext::shared_ptr<CdsHelper> cds12m(new SpreadCdsHelper(
+                                                                  cdspremium_vec[1], 12 * Months, 1, WeekendsOnly(), Quarterly, Following,
+                                                                  DateGeneration::CDS,  Actual360(), 0.4, discountingTermStructure, true, true, Date(),
+                                                                  Actual360(true), true, model));
+            ext::shared_ptr<CdsHelper> cds24m(new SpreadCdsHelper(
+                                                                  cdspremium_vec[2], 24 * Months, 1,WeekendsOnly(), Quarterly, Following,
+                                                                  DateGeneration::CDS,  Actual360(), 0.4, discountingTermStructure, true, true, Date(),
+                                                                  Actual360(true), true, model));
+            ext::shared_ptr<CdsHelper> cds36m(new SpreadCdsHelper(
+                                                                  cdspremium_vec[3], 36 * Months, 1, WeekendsOnly(), Quarterly, Following,
+                                                                  DateGeneration::CDS,  Actual360(), 0.4, discountingTermStructure, true, true, Date(),
+                                                                  Actual360(true), true, model));
+            
+               std::vector<ext::shared_ptr<DefaultProbabilityHelper> > isdaCdsHelpers_temp;
+               
+               isdaCdsHelpers_temp.push_back(cds6m);
+               isdaCdsHelpers_temp.push_back(cds12m);
+               isdaCdsHelpers_temp.push_back(cds24m);
+               isdaCdsHelpers_temp.push_back(cds36m);
+               
+               Handle<DefaultProbabilityTermStructure> isdaCts_temp =
+               Handle<DefaultProbabilityTermStructure>(ext::make_shared<
+                                                       PiecewiseDefaultCurve<SurvivalProbability, LogLinear> >(curveDate
+                                                                                                               ,isdaCdsHelpers_temp,                            Actual365Fixed()));
+               isdaCts->enableExtrapolation(true);
+               
+            ext::shared_ptr<CreditDefaultSwap> trade_uscds_eur_1y_temp =
+                   ext::shared_ptr<CreditDefaultSwap>(
+                       new CreditDefaultSwap(Protection::Seller, 100000000.0, 0.0088, sched_1y,
+                                             Following, Actual360(), true, true,
+                                             Date(10,March,2023), ext::shared_ptr<Claim>(),
+                                             Actual360(true), true));
+
+               ext::shared_ptr<IsdaCdsEngine> engine_temp = ext::make_shared<IsdaCdsEngine>(
+                       Handle<DefaultProbabilityTermStructure>(isdaCts_temp), 0.4, discountingTermStructure,
+                       false, IsdaCdsEngine::Taylor, IsdaCdsEngine::NoBias, IsdaCdsEngine::Piecewise);
+
+               trade_uscds_eur_1y_temp->setPricingEngine(engine_temp);
+
+               std::cout << i <<"th tenor Par Spread Delta = " << fixed<<
+                -(trade_uscds_eur_1y->NPV()- trade_uscds_eur_1y_temp->NPV())/0.0001 << std::endl;
+
+               
+               cdspremium_vec[i] = cdspremium_vec[i] -0.0001;
+           }
+           
+           
+           
+           
+           std::cout << "Swap Sensitivity " << std::endl;
+           
+           for (int i =0; i<SWAPDATA.size();i++)
+           {
+               
+               SWAPDATA[i].second = SWAPDATA[i].second + 0.0001;
+               
+               std::vector<ext::shared_ptr<RateHelper>> esterInstruments_temp;
+               
+               for (int i = 0; i < SWAPDATA.size(); i++)
+               {
+                   ext::shared_ptr<Quote> sw(new SimpleQuote(SWAPDATA[i].second));
+                   auto helper = ext::make_shared<OISRateHelper>(2, SWAPDATA[i].first * Months, Handle<Quote>(sw), estser);
+                   esterInstruments_temp.push_back(helper);
+               }
+               
+               
+               ext::shared_ptr<YieldTermStructure> esterTermStructure_temp(new PiecewiseYieldCurve<Discount, LogLinear>(curveDate,
+                                                                                                                   esterInstruments_temp,                           Actual365Fixed()));
+               
+               esterTermStructure_temp->enableExtrapolation(true);
+               RelinkableHandle<YieldTermStructure> discountingTermStructure_temp;
+               discountingTermStructure_temp.linkTo(esterTermStructure_temp);
+               
+               
+            ext::shared_ptr<CreditDefaultSwap> trade_uscds_eur_1y_temp =
+                   ext::shared_ptr<CreditDefaultSwap>(
+                       new CreditDefaultSwap(Protection::Seller, 100000000.0, 0.0088, sched_1y,
+                                             Following, Actual360(), true, true,
+                                             Date(10,March,2023), ext::shared_ptr<Claim>(),
+                                             Actual360(true), true));
+
+               ext::shared_ptr<IsdaCdsEngine> engine_temp = ext::make_shared<IsdaCdsEngine>(
+                       Handle<DefaultProbabilityTermStructure>(isdaCts), 0.4, discountingTermStructure_temp,
+                       false, IsdaCdsEngine::Taylor, IsdaCdsEngine::NoBias, IsdaCdsEngine::Piecewise);
+
+               trade_uscds_eur_1y_temp->setPricingEngine(engine_temp);
+
+               std::cout << i <<"th tenor Swap Delta = " << fixed<<
+                -(trade_uscds_eur_1y->NPV()- trade_uscds_eur_1y_temp->NPV())/0.0001 << std::endl;
+
+               
+               SWAPDATA[i].second = SWAPDATA[i].second -0.0001;
+           }
            
            
         return 0;
